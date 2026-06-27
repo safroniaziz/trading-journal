@@ -1,0 +1,61 @@
+:root {
+  --bg: #060711;
+  --panel: rgba(15, 23, 42, 0.86);
+  --panel-soft: rgba(30, 41, 59, 0.72);
+  --border: rgba(148, 163, 184, 0.16);
+  --text: #e5e7eb;
+  --muted: #94a3b8;
+  --faint: #64748b;
+  --cyan: #38bdf8;
+  --violet: #a78bfa;
+  --green: #4ade80;
+  --red: #fb7185;
+  --yellow: #facc15;
+  --shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', sans-serif;
+
+  font-family: var(--font);
+  color: var(--text);
+  background:
+    radial-gradient(circle at 20% 0%, rgba(56, 189, 248, 0.25), transparent 32rem),
+    radial-gradient(circle at 80% 10%, rgba(167, 139, 250, 0.26), transparent 28rem),
+    var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+}
+
+body {
+  min-height: 100%;
+  margin: 0;
+  overflow-x: hidden;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+#root {
+  width: min(100%, 430px);
+  min-height: 100dvh;
+  margin: 0 auto;
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.3), rgba(2, 6, 23, 0.74)),
+    rgba(2, 6, 23, 0.68);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05), var(--shadow);
+}
