@@ -79,6 +79,7 @@ h3 {
 }
 
 .rate-pill span,
+.rate-pill small,
 .stat-card span,
 .stat-card small,
 .section-title span,
@@ -93,6 +94,11 @@ h3 {
   display: block;
   margin-top: 3px;
   font-size: 0.95rem;
+}
+
+.rate-pill small {
+  display: block;
+  margin-top: 2px;
 }
 
 .period-tabs,

@@ -8,6 +8,7 @@ const ENTRIES_KEY_V1 = 'trading-journal.entries.v1'
 const ENTRIES_KEY_V2 = 'trading-journal.entries.v2'
 const RATE_KEY = 'trading-journal.usd-idr-rate.v1'
 const FALLBACK_RATE = 16400
+const RATE_REFRESH_MS = 60_000
 
 const TRANSACTION_LABELS: Record<TransactionType, string> = {
   trade: 'Trade',
@@ -349,9 +350,13 @@ function App() {
     }
 
     void fetchRate()
+    const refreshTimer = window.setInterval(() => {
+      void fetchRate()
+    }, RATE_REFRESH_MS)
 
     return () => {
       ignore = true
+      window.clearInterval(refreshTimer)
     }
   }, [])
 
@@ -404,6 +409,7 @@ function App() {
         <div className="rate-pill">
           <span>USD/IDR</span>
           <strong>{formatIDR(rate.value)}</strong>
+          <small>Auto 1 menit</small>
         </div>
       </section>
 
