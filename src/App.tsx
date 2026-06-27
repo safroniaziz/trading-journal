@@ -401,10 +401,20 @@ function App() {
   return (
     <main className="app-shell">
       <section className="hero-card">
-        <div>
-          <p className="eyebrow">Private iPhone journal</p>
-          <h1>Trading Journal</h1>
-          <p className="subtitle">Trade, deposit, penarikan, pengeluaran. Semua lokal.</p>
+        <div className="hero-main">
+          <p className="eyebrow">Equity sekarang</p>
+          <h1>{formatUSD(latestEquityUSD)}</h1>
+          <p className="subtitle">{formatIDR(latestEquityUSD * rate.value)}</p>
+          <div className="hero-metrics">
+            <span>
+              P/L periode
+              <strong className={summary.plUSD >= 0 ? 'positive' : 'negative'}>{formatUSD(summary.plUSD)}</strong>
+            </span>
+            <span>
+              Net cashflow
+              <strong className={summary.netCashflowUSD >= 0 ? 'positive' : 'negative'}>{formatUSD(summary.netCashflowUSD)}</strong>
+            </span>
+          </div>
         </div>
         <div className="rate-pill">
           <span>USD/IDR</span>
