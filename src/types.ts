@@ -13,7 +13,9 @@ export type JournalEntry = {
   note: string
   depositAmount: number
   depositCurrency: Currency
+  depositIDR: number
   withdrawalUSD: number
+  withdrawalIDR: number
   expenseUSD: number
   plUSD: number | null
   equityUSD: number
