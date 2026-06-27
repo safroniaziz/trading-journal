@@ -10,6 +10,7 @@ export type JournalEntry = {
   id: string
   date: string
   type: TransactionType
+  broker: string
   note: string
   depositAmount: number
   depositCurrency: Currency

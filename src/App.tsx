@@ -31,6 +31,9 @@ const DIRECTION_LABELS: Record<TradeDirection, string> = {
   sell: 'Sell',
 }
 
+const DEFAULT_BROKER = 'Finex'
+const DEFAULT_INSTRUMENT = 'XAUUSD'
+
 const SEED_ENTRIES: JournalEntry[] = []
 
 type V1Entry = {
@@ -53,6 +56,7 @@ type V2Entry = V1Entry & {
 type FormState = {
   date: string
   type: TransactionType
+  broker: string
   note: string
   depositAmount: string
   depositIDR: string
@@ -95,6 +99,7 @@ function createEmptyForm(): FormState {
   return {
     date: getToday(),
     type: 'trade',
+    broker: DEFAULT_BROKER,
     note: '',
     depositAmount: '',
     depositIDR: '',
@@ -103,7 +108,7 @@ function createEmptyForm(): FormState {
     expenseUSD: '',
     plUSD: '',
     equityUSD: '',
-    instrument: '',
+    instrument: DEFAULT_INSTRUMENT,
     direction: 'buy',
     entryPrice: '',
     exitPrice: '',
@@ -117,6 +122,7 @@ function normalizeEntry(entry: Partial<JournalEntry> & Pick<JournalEntry, 'id' |
     id: entry.id,
     date: entry.date,
     type: entry.type,
+    broker: entry.broker ?? DEFAULT_BROKER,
     note: entry.note,
     depositAmount: entry.depositAmount ?? 0,
     depositCurrency: 'USD',
@@ -126,7 +132,7 @@ function normalizeEntry(entry: Partial<JournalEntry> & Pick<JournalEntry, 'id' |
     expenseUSD: entry.expenseUSD ?? 0,
     plUSD: entry.plUSD ?? null,
     equityUSD: entry.equityUSD ?? 0,
-    instrument: entry.instrument ?? '',
+    instrument: entry.instrument ?? DEFAULT_INSTRUMENT,
     direction: entry.direction ?? 'buy',
     entryPrice: entry.entryPrice ?? 0,
     exitPrice: entry.exitPrice ?? 0,
@@ -438,6 +444,7 @@ function entryToForm(entry: JournalEntry): FormState {
   return {
     date: entry.date,
     type: entry.type,
+    broker: entry.broker || DEFAULT_BROKER,
     note: entry.note,
     depositAmount: entry.depositAmount ? String(entry.depositAmount) : '',
     depositIDR: entry.depositIDR ? String(entry.depositIDR) : '',
@@ -596,6 +603,7 @@ function App() {
       id: editingEntryId ?? crypto.randomUUID(),
       date: form.date,
       type: form.type,
+      broker: form.broker.trim() || DEFAULT_BROKER,
       note: form.note.trim(),
       depositAmount: form.type === 'deposit' ? parseNumber(form.depositAmount) : 0,
       depositCurrency: 'USD',
@@ -730,6 +738,7 @@ function App() {
                       </strong>
                     </div>
                     <div className="entry-meta">
+                      {entry.broker && <span>Broker {entry.broker}</span>}
                       {entry.type === 'trade' && entry.instrument && <span>{DIRECTION_LABELS[entry.direction]} {entry.instrument}</span>}
                       {entry.type === 'trade' && entry.entryPrice > 0 && <span>Entry {entry.entryPrice}</span>}
                       {entry.type === 'trade' && entry.exitPrice > 0 && <span>Exit {entry.exitPrice}</span>}
@@ -783,6 +792,10 @@ function App() {
             <label>
               Tanggal
               <input type="date" value={form.date} onChange={(event) => updateForm('date', event.target.value)} required />
+            </label>
+            <label>
+              Broker
+              <input value={form.broker} onChange={(event) => updateForm('broker', event.target.value)} placeholder="Finex" />
             </label>
             <label>
               Catatan
