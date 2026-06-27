@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { EquityChart } from './Chart'
-import type { Currency, JournalEntry, PeriodFilter, RateState, TradeDirection, TransactionType } from './types'
+import type { JournalEntry, PeriodFilter, RateState, TradeDirection, TransactionType } from './types'
 import './App.css'
 
 const ENTRIES_KEY_V1 = 'trading-journal.entries.v1'
@@ -54,7 +54,6 @@ type FormState = {
   type: TransactionType
   note: string
   depositAmount: string
-  depositCurrency: Currency
   withdrawalUSD: string
   expenseUSD: string
   plUSD: string
@@ -93,7 +92,6 @@ function createEmptyForm(): FormState {
     type: 'trade',
     note: '',
     depositAmount: '',
-    depositCurrency: 'USD',
     withdrawalUSD: '',
     expenseUSD: '',
     plUSD: '',
@@ -503,7 +501,7 @@ function App() {
       type: form.type,
       note: form.note.trim(),
       depositAmount: form.type === 'deposit' ? parseNumber(form.depositAmount) : 0,
-      depositCurrency: form.depositCurrency,
+      depositCurrency: 'USD',
       withdrawalUSD: form.type === 'withdrawal' ? parseNumber(form.withdrawalUSD) : 0,
       expenseUSD: form.type === 'expense' ? parseNumber(form.expenseUSD) : 0,
       plUSD: form.type === 'trade' ? parseNullableNumber(form.plUSD) : null,
@@ -576,9 +574,9 @@ function App() {
           <small>{formatIDR(summary.depositUSD * rate.value)}</small>
         </article>
         <article className="stat-card">
-          <span>Deposit IDR asli</span>
-          <strong>{formatIDR(summary.depositIDR)}</strong>
-          <small>Kurs {rate.source} · {formatRateDate(rate.updatedAt)}</small>
+          <span>Kurs USD/IDR</span>
+          <strong>{formatIDR(rate.value)}</strong>
+          <small>{rate.source} · {formatRateDate(rate.updatedAt)}</small>
         </article>
         <article className="stat-card">
           <span>Penarikan</span>
@@ -681,19 +679,10 @@ function App() {
             </label>
             <div className="form-grid">
               {form.type === 'deposit' && (
-                <>
-                  <label>
-                    Jumlah deposit
-                    <input inputMode="decimal" value={form.depositAmount} onChange={(event) => updateForm('depositAmount', event.target.value)} placeholder="112" />
-                  </label>
-                  <label>
-                    Mata uang
-                    <select value={form.depositCurrency} onChange={(event) => updateForm('depositCurrency', event.target.value as Currency)}>
-                      <option value="USD">USD</option>
-                      <option value="IDR">IDR</option>
-                    </select>
-                  </label>
-                </>
+                <label>
+                  Deposit USD
+                  <input inputMode="decimal" value={form.depositAmount} onChange={(event) => updateForm('depositAmount', event.target.value)} placeholder="112" />
+                </label>
               )}
               {form.type === 'trade' && (
                 <>
