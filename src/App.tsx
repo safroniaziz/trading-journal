@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { EquityChart } from './Chart'
-import type { JournalEntry, PeriodFilter, RateState, TransactionType } from './types'
+import type { Currency, JournalEntry, PeriodFilter, RateState, TradeDirection, TransactionType } from './types'
 import './App.css'
 
 const ENTRIES_KEY_V1 = 'trading-journal.entries.v1'
 const ENTRIES_KEY_V2 = 'trading-journal.entries.v2'
+const ENTRIES_KEY_V3 = 'trading-journal.entries.v3'
 const RATE_KEY = 'trading-journal.usd-idr-rate.v1'
 const FALLBACK_RATE = 16400
 const RATE_REFRESH_MS = 60_000
@@ -24,6 +25,11 @@ const PERIOD_LABELS: Record<PeriodFilter, string> = {
   all: 'Semua',
 }
 
+const DIRECTION_LABELS: Record<TradeDirection, string> = {
+  buy: 'Buy',
+  sell: 'Sell',
+}
+
 const SEED_ENTRIES: JournalEntry[] = []
 
 type V1Entry = {
@@ -37,17 +43,28 @@ type V1Entry = {
   bankUSD: number
 }
 
+type V2Entry = V1Entry & {
+  type: TransactionType
+  withdrawalUSD: number
+  expenseUSD: number
+}
+
 type FormState = {
   date: string
   type: TransactionType
   note: string
-  depositUSD: string
-  depositIDR: string
+  depositAmount: string
+  depositCurrency: Currency
   withdrawalUSD: string
   expenseUSD: string
   plUSD: string
   equityUSD: string
-  bankUSD: string
+  instrument: string
+  direction: TradeDirection
+  entryPrice: string
+  exitPrice: string
+  pips: string
+  lot: string
 }
 
 type Summary = {
@@ -75,82 +92,167 @@ function createEmptyForm(): FormState {
     date: getToday(),
     type: 'trade',
     note: '',
-    depositUSD: '',
-    depositIDR: '',
+    depositAmount: '',
+    depositCurrency: 'USD',
     withdrawalUSD: '',
     expenseUSD: '',
     plUSD: '',
     equityUSD: '',
-    bankUSD: '',
+    instrument: '',
+    direction: 'buy',
+    entryPrice: '',
+    exitPrice: '',
+    pips: '',
+    lot: '',
   }
 }
 
-function createEntry(base: Omit<JournalEntry, 'withdrawalUSD' | 'expenseUSD'> & Partial<Pick<JournalEntry, 'withdrawalUSD' | 'expenseUSD'>>): JournalEntry {
+function normalizeEntry(entry: Partial<JournalEntry> & Pick<JournalEntry, 'id' | 'date' | 'type' | 'note'>): JournalEntry {
   return {
-    ...base,
-    withdrawalUSD: base.withdrawalUSD ?? 0,
-    expenseUSD: base.expenseUSD ?? 0,
+    id: entry.id,
+    date: entry.date,
+    type: entry.type,
+    note: entry.note,
+    depositAmount: entry.depositAmount ?? 0,
+    depositCurrency: entry.depositCurrency ?? 'USD',
+    withdrawalUSD: entry.withdrawalUSD ?? 0,
+    expenseUSD: entry.expenseUSD ?? 0,
+    plUSD: entry.plUSD ?? null,
+    equityUSD: entry.equityUSD ?? 0,
+    instrument: entry.instrument ?? '',
+    direction: entry.direction ?? 'buy',
+    entryPrice: entry.entryPrice ?? 0,
+    exitPrice: entry.exitPrice ?? 0,
+    pips: entry.pips ?? 0,
+    lot: entry.lot ?? 0,
   }
 }
 
-function migrateV1ToV2(v1Entries: V1Entry[]) {
-  const migrated = v1Entries.flatMap((entry) => {
-    const nextEntries: JournalEntry[] = []
+function appendLegacyBankNote(note: string, bankUSD: number) {
+  if (bankUSD <= 0) return note
+  const suffix = `Rekening lama: $${bankUSD}`
+  return note ? `${note} · ${suffix}` : suffix
+}
+
+function migrateV1ToV2(v1Entries: V1Entry[]): V2Entry[] {
+  return v1Entries.flatMap((entry) => {
+    const nextEntries: V2Entry[] = []
 
     if (entry.depositUSD > 0 || entry.depositIDR > 0) {
-      nextEntries.push(createEntry({
+      nextEntries.push({
         id: `${entry.id}-deposit`,
         date: entry.date,
         type: 'deposit',
         note: entry.note || 'Deposit dari data lama.',
         depositUSD: entry.depositUSD,
         depositIDR: entry.depositIDR,
+        withdrawalUSD: 0,
+        expenseUSD: 0,
         plUSD: null,
         equityUSD: entry.equityUSD,
         bankUSD: entry.bankUSD,
-      }))
+      })
     }
 
     if (entry.plUSD !== null) {
-      nextEntries.push(createEntry({
+      nextEntries.push({
         id: `${entry.id}-trade`,
         date: entry.date,
         type: 'trade',
         note: entry.note || 'Trade dari data lama.',
         depositUSD: 0,
         depositIDR: 0,
+        withdrawalUSD: 0,
+        expenseUSD: 0,
         plUSD: entry.plUSD,
         equityUSD: entry.equityUSD,
         bankUSD: entry.bankUSD,
-      }))
+      })
     }
 
     if (nextEntries.length === 0) {
-      nextEntries.push(createEntry({
+      nextEntries.push({
         id: `${entry.id}-note`,
         date: entry.date,
         type: 'trade',
         note: entry.note,
         depositUSD: 0,
         depositIDR: 0,
+        withdrawalUSD: 0,
+        expenseUSD: 0,
         plUSD: null,
         equityUSD: entry.equityUSD,
         bankUSD: entry.bankUSD,
-      }))
+      })
     }
 
     return nextEntries
+  })
+}
+
+function migrateV2ToV3(v2Entries: V2Entry[]): JournalEntry[] {
+  const migrated = v2Entries.flatMap((entry) => {
+    const note = appendLegacyBankNote(entry.note, entry.bankUSD)
+    const base = {
+      date: entry.date,
+      note,
+      withdrawalUSD: entry.withdrawalUSD,
+      expenseUSD: entry.expenseUSD,
+      plUSD: entry.plUSD,
+      equityUSD: entry.equityUSD,
+    }
+
+    if (entry.type === 'deposit' && entry.depositUSD > 0 && entry.depositIDR > 0) {
+      return [
+        normalizeEntry({
+          ...base,
+          id: `${entry.id}-usd`,
+          type: 'deposit',
+          depositAmount: entry.depositUSD,
+          depositCurrency: 'USD',
+        }),
+        normalizeEntry({
+          ...base,
+          id: `${entry.id}-idr`,
+          type: 'deposit',
+          depositAmount: entry.depositIDR,
+          depositCurrency: 'IDR',
+        }),
+      ]
+    }
+
+    return normalizeEntry({
+      ...base,
+      id: entry.id,
+      type: entry.type,
+      depositAmount: entry.type === 'deposit' ? entry.depositUSD || entry.depositIDR : 0,
+      depositCurrency: entry.depositIDR > 0 && entry.depositUSD === 0 ? 'IDR' : 'USD',
+    })
   })
 
   return sortEntries(migrated)
 }
 
 function parseStoredEntries(): JournalEntry[] {
+  const storedV3 = localStorage.getItem(ENTRIES_KEY_V3)
+  if (storedV3) {
+    try {
+      const parsed = JSON.parse(storedV3) as JournalEntry[]
+      return Array.isArray(parsed) ? sortEntries(parsed.map(normalizeEntry)) : SEED_ENTRIES
+    } catch {
+      return SEED_ENTRIES
+    }
+  }
+
   const storedV2 = localStorage.getItem(ENTRIES_KEY_V2)
   if (storedV2) {
     try {
-      const parsed = JSON.parse(storedV2) as JournalEntry[]
-      return Array.isArray(parsed) ? sortEntries(parsed) : SEED_ENTRIES
+      const parsed = JSON.parse(storedV2) as V2Entry[]
+      if (Array.isArray(parsed)) {
+        const migrated = migrateV2ToV3(parsed)
+        localStorage.setItem(ENTRIES_KEY_V3, JSON.stringify(migrated))
+        return migrated
+      }
     } catch {
       return SEED_ENTRIES
     }
@@ -161,8 +263,8 @@ function parseStoredEntries(): JournalEntry[] {
     try {
       const parsed = JSON.parse(storedV1) as V1Entry[]
       if (Array.isArray(parsed) && parsed.length > 0) {
-        const migrated = migrateV1ToV2(parsed)
-        localStorage.setItem(ENTRIES_KEY_V2, JSON.stringify(migrated))
+        const migrated = migrateV2ToV3(migrateV1ToV2(parsed))
+        localStorage.setItem(ENTRIES_KEY_V3, JSON.stringify(migrated))
         return migrated
       }
     } catch {
@@ -229,6 +331,10 @@ function formatIDR(value: number) {
   }).format(value)
 }
 
+function formatDeposit(entry: JournalEntry) {
+  return entry.depositCurrency === 'IDR' ? formatIDR(entry.depositAmount) : formatUSD(entry.depositAmount)
+}
+
 function sortEntries(entries: JournalEntry[]) {
   return [...entries].sort((a, b) => b.date.localeCompare(a.date))
 }
@@ -255,10 +361,15 @@ function getPeriodLabel(key: string, period: PeriodFilter, entries: JournalEntry
   return `${entries.length} semua catatan`
 }
 
-function summarizeEntries(entries: JournalEntry[]): Summary {
+function toUSDEquivalent(entry: JournalEntry, rate: number) {
+  if (entry.depositCurrency === 'IDR') return entry.depositAmount / rate
+  return entry.depositAmount
+}
+
+function summarizeEntries(entries: JournalEntry[], rate: number): Summary {
   const plUSD = entries.reduce((total, entry) => total + (entry.plUSD ?? 0), 0)
-  const depositUSD = entries.reduce((total, entry) => total + entry.depositUSD, 0)
-  const depositIDR = entries.reduce((total, entry) => total + entry.depositIDR, 0)
+  const depositUSD = entries.reduce((total, entry) => total + (entry.type === 'deposit' ? toUSDEquivalent(entry, rate) : 0), 0)
+  const depositIDR = entries.reduce((total, entry) => total + (entry.type === 'deposit' && entry.depositCurrency === 'IDR' ? entry.depositAmount : 0), 0)
   const withdrawalUSD = entries.reduce((total, entry) => total + entry.withdrawalUSD, 0)
   const expenseUSD = entries.reduce((total, entry) => total + entry.expenseUSD, 0)
 
@@ -279,7 +390,7 @@ function filterEntriesByLatestPeriod(entries: JournalEntry[], period: PeriodFilt
   return entries.filter((entry) => getPeriodKey(entry.date, period) === latestKey)
 }
 
-function groupEntries(entries: JournalEntry[], period: PeriodFilter): EntryGroup[] {
+function groupEntries(entries: JournalEntry[], period: PeriodFilter, rate: number): EntryGroup[] {
   const fallbackPeriod = period === 'all' ? 'monthly' : period
   const groupMap = new Map<string, JournalEntry[]>()
 
@@ -294,15 +405,22 @@ function groupEntries(entries: JournalEntry[], period: PeriodFilter): EntryGroup
     key,
     label: getPeriodLabel(key, fallbackPeriod, group),
     entries: sortEntries(group),
-    summary: summarizeEntries(group),
+    summary: summarizeEntries(group, rate),
   }))
 }
 
-function getEntryAmount(entry: JournalEntry) {
+function getSignedEntryAmount(entry: JournalEntry, rate: number) {
   if (entry.type === 'trade') return entry.plUSD
-  if (entry.type === 'deposit') return entry.depositUSD || entry.depositIDR
+  if (entry.type === 'deposit') return toUSDEquivalent(entry, rate)
   if (entry.type === 'withdrawal') return -entry.withdrawalUSD
   return -entry.expenseUSD
+}
+
+function formatEntryAmount(entry: JournalEntry) {
+  if (entry.type === 'trade') return entry.plUSD === null ? '-' : formatUSD(entry.plUSD)
+  if (entry.type === 'deposit') return formatDeposit(entry)
+  if (entry.type === 'withdrawal') return `-${formatUSD(entry.withdrawalUSD)}`
+  return `-${formatUSD(entry.expenseUSD)}`
 }
 
 function App() {
@@ -323,7 +441,7 @@ function App() {
   const [form, setForm] = useState<FormState>(createEmptyForm)
 
   useEffect(() => {
-    localStorage.setItem(ENTRIES_KEY_V2, JSON.stringify(entries))
+    localStorage.setItem(ENTRIES_KEY_V3, JSON.stringify(entries))
   }, [entries])
 
   useEffect(() => {
@@ -362,13 +480,13 @@ function App() {
 
   const sortedEntries = useMemo(() => sortEntries(entries), [entries])
   const visibleEntries = useMemo(() => filterEntriesByLatestPeriod(entries, period), [entries, period])
-  const entryGroups = useMemo(() => groupEntries(visibleEntries, period), [visibleEntries, period])
-  const summary = useMemo(() => summarizeEntries(visibleEntries), [visibleEntries])
+  const entryGroups = useMemo(() => groupEntries(visibleEntries, period, rate.value), [visibleEntries, period, rate.value])
+  const summary = useMemo(() => summarizeEntries(visibleEntries, rate.value), [visibleEntries, rate.value])
   const latestEntry = sortedEntries[0]
   const latestEquityUSD = latestEntry?.equityUSD ?? 0
   const activePeriodLabel = entryGroups[0]?.label ?? 'Belum ada data'
 
-  function updateForm(field: keyof FormState, value: string) {
+  function updateForm<K extends keyof FormState>(field: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [field]: value }))
   }
 
@@ -379,19 +497,24 @@ function App() {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    const nextEntry: JournalEntry = {
+    const nextEntry = normalizeEntry({
       id: crypto.randomUUID(),
       date: form.date,
       type: form.type,
       note: form.note.trim(),
-      depositUSD: form.type === 'deposit' ? parseNumber(form.depositUSD) : 0,
-      depositIDR: form.type === 'deposit' ? parseNumber(form.depositIDR) : 0,
+      depositAmount: form.type === 'deposit' ? parseNumber(form.depositAmount) : 0,
+      depositCurrency: form.depositCurrency,
       withdrawalUSD: form.type === 'withdrawal' ? parseNumber(form.withdrawalUSD) : 0,
       expenseUSD: form.type === 'expense' ? parseNumber(form.expenseUSD) : 0,
       plUSD: form.type === 'trade' ? parseNullableNumber(form.plUSD) : null,
       equityUSD: parseNumber(form.equityUSD),
-      bankUSD: parseNumber(form.bankUSD),
-    }
+      instrument: form.type === 'trade' ? form.instrument.trim().toUpperCase() : '',
+      direction: form.direction,
+      entryPrice: form.type === 'trade' ? parseNumber(form.entryPrice) : 0,
+      exitPrice: form.type === 'trade' ? parseNumber(form.exitPrice) : 0,
+      pips: form.type === 'trade' ? parseNumber(form.pips) : 0,
+      lot: form.type === 'trade' ? parseNumber(form.lot) : 0,
+    })
 
     setEntries((current) => sortEntries([nextEntry, ...current]))
     setForm(createEmptyForm())
@@ -448,12 +571,12 @@ function App() {
           <small>{formatIDR(summary.plUSD * rate.value)}</small>
         </article>
         <article className="stat-card">
-          <span>Deposit USD</span>
+          <span>Deposit total</span>
           <strong>{formatUSD(summary.depositUSD)}</strong>
           <small>{formatIDR(summary.depositUSD * rate.value)}</small>
         </article>
         <article className="stat-card">
-          <span>Deposit IDR</span>
+          <span>Deposit IDR asli</span>
           <strong>{formatIDR(summary.depositIDR)}</strong>
           <small>Kurs {rate.source} · {formatRateDate(rate.updatedAt)}</small>
         </article>
@@ -492,26 +615,29 @@ function App() {
               </div>
 
               {group.entries.map((entry) => {
-                const amount = getEntryAmount(entry)
+                const amount = getSignedEntryAmount(entry, rate.value)
                 return (
                   <article className="entry-card" key={entry.id}>
                     <div className="entry-top">
                       <div>
                         <span className={`type-badge ${entry.type}`}>{TRANSACTION_LABELS[entry.type]}</span>
-                        <h3>{formatDate(entry.date)}</h3>
+                        <h3>{entry.type === 'trade' && entry.instrument ? entry.instrument : formatDate(entry.date)}</h3>
                         <p>{entry.note || 'Tanpa catatan'}</p>
                       </div>
                       <strong className={amount === null || amount >= 0 ? 'positive' : 'negative'}>
-                        {amount === null ? '-' : typeof amount === 'number' && entry.type === 'deposit' && entry.depositIDR > 0 && entry.depositUSD === 0 ? formatIDR(amount) : formatUSD(amount)}
+                        {formatEntryAmount(entry)}
                       </strong>
                     </div>
                     <div className="entry-meta">
-                      {entry.depositUSD > 0 && <span>Deposit {formatUSD(entry.depositUSD)}</span>}
-                      {entry.depositIDR > 0 && <span>{formatIDR(entry.depositIDR)}</span>}
+                      {entry.type === 'trade' && entry.instrument && <span>{DIRECTION_LABELS[entry.direction]} {entry.instrument}</span>}
+                      {entry.type === 'trade' && entry.entryPrice > 0 && <span>Entry {entry.entryPrice}</span>}
+                      {entry.type === 'trade' && entry.exitPrice > 0 && <span>Exit {entry.exitPrice}</span>}
+                      {entry.type === 'trade' && entry.pips !== 0 && <span>{entry.pips} pips</span>}
+                      {entry.type === 'trade' && entry.lot > 0 && <span>{entry.lot} lot</span>}
+                      {entry.type === 'deposit' && entry.depositAmount > 0 && <span>Deposit {formatDeposit(entry)}</span>}
                       {entry.withdrawalUSD > 0 && <span>Tarik {formatUSD(entry.withdrawalUSD)}</span>}
                       {entry.expenseUSD > 0 && <span>Expense {formatUSD(entry.expenseUSD)}</span>}
                       {entry.equityUSD > 0 && <span>Equity {formatUSD(entry.equityUSD)}</span>}
-                      {entry.bankUSD > 0 && <span>Rekening {formatUSD(entry.bankUSD)}</span>}
                     </div>
                   </article>
                 )
@@ -551,26 +677,58 @@ function App() {
             </label>
             <label>
               Catatan
-              <textarea value={form.note} onChange={(event) => updateForm('note', event.target.value)} placeholder="Contoh: WD profit, bayar VPS, ikut kelas" />
+              <textarea value={form.note} onChange={(event) => updateForm('note', event.target.value)} placeholder="Contoh: setup bagus, news, WD profit, bayar VPS" />
             </label>
             <div className="form-grid">
               {form.type === 'deposit' && (
                 <>
                   <label>
-                    Deposit USD
-                    <input inputMode="decimal" value={form.depositUSD} onChange={(event) => updateForm('depositUSD', event.target.value)} placeholder="112" />
+                    Jumlah deposit
+                    <input inputMode="decimal" value={form.depositAmount} onChange={(event) => updateForm('depositAmount', event.target.value)} placeholder="112" />
                   </label>
                   <label>
-                    Deposit IDR
-                    <input inputMode="numeric" value={form.depositIDR} onChange={(event) => updateForm('depositIDR', event.target.value)} placeholder="500000" />
+                    Mata uang
+                    <select value={form.depositCurrency} onChange={(event) => updateForm('depositCurrency', event.target.value as Currency)}>
+                      <option value="USD">USD</option>
+                      <option value="IDR">IDR</option>
+                    </select>
                   </label>
                 </>
               )}
               {form.type === 'trade' && (
-                <label>
-                  P/L USD
-                  <input inputMode="decimal" value={form.plUSD} onChange={(event) => updateForm('plUSD', event.target.value)} placeholder="25" />
-                </label>
+                <>
+                  <label>
+                    Instrumen
+                    <input value={form.instrument} onChange={(event) => updateForm('instrument', event.target.value)} placeholder="XAUUSD" />
+                  </label>
+                  <label>
+                    Arah
+                    <select value={form.direction} onChange={(event) => updateForm('direction', event.target.value as TradeDirection)}>
+                      <option value="buy">Buy</option>
+                      <option value="sell">Sell</option>
+                    </select>
+                  </label>
+                  <label>
+                    Entry price
+                    <input inputMode="decimal" value={form.entryPrice} onChange={(event) => updateForm('entryPrice', event.target.value)} placeholder="2320" />
+                  </label>
+                  <label>
+                    Exit price
+                    <input inputMode="decimal" value={form.exitPrice} onChange={(event) => updateForm('exitPrice', event.target.value)} placeholder="2325" />
+                  </label>
+                  <label>
+                    Pips
+                    <input inputMode="decimal" value={form.pips} onChange={(event) => updateForm('pips', event.target.value)} placeholder="50" />
+                  </label>
+                  <label>
+                    Lot
+                    <input inputMode="decimal" value={form.lot} onChange={(event) => updateForm('lot', event.target.value)} placeholder="0.10" />
+                  </label>
+                  <label>
+                    Profit/Loss USD
+                    <input inputMode="decimal" value={form.plUSD} onChange={(event) => updateForm('plUSD', event.target.value)} placeholder="25" />
+                  </label>
+                </>
               )}
               {form.type === 'withdrawal' && (
                 <label>
@@ -587,10 +745,6 @@ function App() {
               <label>
                 Equity USD
                 <input inputMode="decimal" value={form.equityUSD} onChange={(event) => updateForm('equityUSD', event.target.value)} placeholder="250" />
-              </label>
-              <label>
-                Rekening USD
-                <input inputMode="decimal" value={form.bankUSD} onChange={(event) => updateForm('bankUSD', event.target.value)} placeholder="50" />
               </label>
             </div>
 

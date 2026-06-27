@@ -2,18 +2,27 @@ export type TransactionType = 'trade' | 'deposit' | 'withdrawal' | 'expense'
 
 export type PeriodFilter = 'daily' | 'weekly' | 'monthly' | 'all'
 
+export type Currency = 'USD' | 'IDR'
+
+export type TradeDirection = 'buy' | 'sell'
+
 export type JournalEntry = {
   id: string
   date: string
   type: TransactionType
   note: string
-  depositUSD: number
-  depositIDR: number
+  depositAmount: number
+  depositCurrency: Currency
   withdrawalUSD: number
   expenseUSD: number
   plUSD: number | null
   equityUSD: number
-  bankUSD: number
+  instrument: string
+  direction: TradeDirection
+  entryPrice: number
+  exitPrice: number
+  pips: number
+  lot: number
 }
 
 export type RateState = {

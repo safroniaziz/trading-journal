@@ -438,6 +438,7 @@ label {
 }
 
 input,
+select,
 textarea {
   width: 100%;
   border: 1px solid rgba(249, 115, 22, 0.18);
@@ -454,6 +455,7 @@ textarea {
 }
 
 input:focus,
+select:focus,
 textarea:focus {
   border-color: rgba(56, 189, 248, 0.7);
   box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.12);
