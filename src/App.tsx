@@ -44,7 +44,7 @@ const DIRECTION_LABELS: Record<TradeDirection, string> = {
   sell: 'Sell',
 }
 
-const DEFAULT_BROKER = 'Finex'
+const DEFAULT_BROKER = 'MIFX'
 const DEFAULT_INSTRUMENT = 'XAUUSD'
 
 const SEED_ENTRIES: JournalEntry[] = []
@@ -500,6 +500,7 @@ function App() {
   const [period, setPeriod] = useState<PeriodFilter>('monthly')
   const [category, setCategory] = useState<CategoryFilter>('all')
   const [chartMode, setChartMode] = useState<ChartMode>('pnl')
+  const [activeView, setActiveView] = useState<'dashboard' | 'history'>('dashboard')
   const [rate, setRate] = useState<RateState>(() => {
     const stored = localStorage.getItem(RATE_KEY)
     if (!stored) return { value: FALLBACK_RATE, updatedAt: null, source: 'fallback' }
@@ -555,13 +556,13 @@ function App() {
   }, [])
 
   const sortedEntries = useMemo(() => sortEntries(entries), [entries])
-  const visibleEntries = useMemo(() => {
+  const historyEntries = useMemo(() => {
     const sorted = sortEntries(entries)
     if (category === 'all') return sorted
     return sorted.filter((entry) => entry.type === category)
   }, [entries, category])
-  const entryGroups = useMemo(() => groupEntries(visibleEntries, period), [visibleEntries, period])
-  const summary = useMemo(() => summarizeEntries(visibleEntries), [visibleEntries])
+  const entryGroups = useMemo(() => groupEntries(historyEntries, period), [historyEntries, period])
+  const allSummary = useMemo(() => summarizeEntries(entries), [entries])
   const latestEntry = sortedEntries[0]
   const latestEquityUSD = latestEntry?.equityUSD ?? 0
   const activePeriodLabel = entryGroups[0]?.label ?? 'Belum ada data'
@@ -653,11 +654,11 @@ function App() {
           <div className="hero-metrics">
             <span>
               P/L periode
-              <strong className={summary.plUSD >= 0 ? 'positive' : 'negative'}>{formatUSD(summary.plUSD)}</strong>
+              <strong className={allSummary.plUSD >= 0 ? 'positive' : 'negative'}>{formatUSD(allSummary.plUSD)}</strong>
             </span>
             <span>
               Realisasi Rp
-              <strong className={summary.realizedIDR >= 0 ? 'positive' : 'negative'}>{formatIDR(summary.realizedIDR)}</strong>
+              <strong className={allSummary.realizedIDR >= 0 ? 'positive' : 'negative'}>{formatIDR(allSummary.realizedIDR)}</strong>
             </span>
           </div>
         </div>
@@ -668,129 +669,141 @@ function App() {
         </div>
       </section>
 
-      <div className="period-tabs" aria-label="Filter periode">
-        {(Object.keys(PERIOD_LABELS) as PeriodFilter[]).map((item) => (
-          <button className={period === item ? 'active' : ''} type="button" key={item} onClick={() => setPeriod(item)}>
-            {PERIOD_LABELS[item]}
-          </button>
-        ))}
+      <div className="view-tabs" aria-label="Menu utama">
+        <button className={activeView === 'dashboard' ? 'active' : ''} type="button" onClick={() => setActiveView('dashboard')}>
+          Dashboard
+        </button>
+        <button className={activeView === 'history' ? 'active' : ''} type="button" onClick={() => setActiveView('history')}>
+          History
+        </button>
       </div>
 
-      <div className="category-tabs" aria-label="Filter kategori">
-        {(Object.keys(CATEGORY_LABELS) as CategoryFilter[]).map((item) => (
-          <button className={category === item ? 'active' : ''} type="button" key={item} onClick={() => setCategory(item)}>
-            {CATEGORY_LABELS[item]}
-          </button>
-        ))}
-      </div>
+      {activeView === 'dashboard' && (
+        <>
+          <section className="stats-grid compact-stats" aria-label="Ringkasan dashboard">
+            <article className="stat-card primary">
+              <span>Equity sekarang</span>
+              <strong>{formatUSD(latestEquityUSD)}</strong>
+              <small>{formatIDR(latestEquityUSD * rate.value)}</small>
+            </article>
+            <article className="stat-card">
+              <span>P/L</span>
+              <strong className={allSummary.plUSD >= 0 ? 'positive' : 'negative'}>{formatUSD(allSummary.plUSD)}</strong>
+              <small>{formatIDR(allSummary.plUSD * rate.value)}</small>
+            </article>
+            <article className="stat-card">
+              <span>Deposit</span>
+              <strong>{formatUSD(allSummary.depositUSD)}</strong>
+              <small>{formatIDR(allSummary.depositIDR)} aktual</small>
+            </article>
+            <article className="stat-card">
+              <span>Realisasi Rp</span>
+              <strong className={allSummary.realizedIDR >= 0 ? 'positive' : 'negative'}>{formatIDR(allSummary.realizedIDR)}</strong>
+              <small>WD - Deposit</small>
+            </article>
+            <article className="stat-card">
+              <span>Penarikan</span>
+              <strong className="negative">{formatUSD(allSummary.withdrawalUSD)}</strong>
+              <small>{formatIDR(allSummary.withdrawalIDR)} aktual</small>
+            </article>
+          </section>
 
-      <section className="period-card">
-        <p className="eyebrow">Ringkasan aktif</p>
-        <h2>{activePeriodLabel}</h2>
-      </section>
-
-      <section className="stats-grid" aria-label="Ringkasan dashboard">
-        <article className="stat-card primary">
-          <span>Equity sekarang</span>
-          <strong>{formatUSD(latestEquityUSD)}</strong>
-          <small>{formatIDR(latestEquityUSD * rate.value)}</small>
-        </article>
-        <article className="stat-card">
-          <span>P/L periode</span>
-          <strong className={summary.plUSD >= 0 ? 'positive' : 'negative'}>{formatUSD(summary.plUSD)}</strong>
-          <small>{formatIDR(summary.plUSD * rate.value)}</small>
-        </article>
-        <article className="stat-card">
-          <span>Deposit</span>
-          <strong>{formatUSD(summary.depositUSD)}</strong>
-          <small>{formatIDR(summary.depositIDR)} aktual</small>
-        </article>
-        <article className="stat-card">
-          <span>Realisasi Rupiah</span>
-          <strong className={summary.realizedIDR >= 0 ? 'positive' : 'negative'}>{formatIDR(summary.realizedIDR)}</strong>
-          <small>WD IDR - Deposit IDR</small>
-        </article>
-        <article className="stat-card">
-          <span>Penarikan</span>
-          <strong className="negative">{formatUSD(summary.withdrawalUSD)}</strong>
-          <small>{formatIDR(summary.withdrawalIDR)} aktual</small>
-        </article>
-        <article className="stat-card">
-          <span>Pengeluaran</span>
-          <strong className="negative">{formatUSD(summary.expenseUSD)}</strong>
-          <small>Net cashflow {formatUSD(summary.netCashflowUSD)}</small>
-        </article>
-      </section>
-
-      <div className="chart-tabs" aria-label="Mode chart">
-        {(Object.keys(CHART_LABELS) as ChartMode[]).map((mode) => (
-          <button className={chartMode === mode ? 'active' : ''} type="button" key={mode} onClick={() => setChartMode(mode)}>
-            {CHART_LABELS[mode]}
-          </button>
-        ))}
-      </div>
-
-      <EquityChart entries={visibleEntries} period={period} chartMode={chartMode} formatUSD={formatUSD} />
-
-      <section className="journal-section">
-        <div className="section-title">
-          <div>
-            <p className="eyebrow">History · {activeCategoryLabel} · {PERIOD_LABELS[period]}</p>
-            <h2>Catatan trading</h2>
+          <div className="chart-tabs" aria-label="Mode chart">
+            {(Object.keys(CHART_LABELS) as ChartMode[]).map((mode) => (
+              <button className={chartMode === mode ? 'active' : ''} type="button" key={mode} onClick={() => setChartMode(mode)}>
+                {CHART_LABELS[mode]}
+              </button>
+            ))}
           </div>
-          <span>{visibleEntries.length} entry</span>
-        </div>
 
-        <div className="entry-list">
-          {entryGroups.map((group) => (
-            <section className="entry-group" key={group.key}>
-              <div className="group-head">
-                <div>
-                  <h3>{group.label}</h3>
-                  <p>{group.entries.length} catatan</p>
-                </div>
-                <strong className={group.summary.plUSD >= 0 ? 'positive' : 'negative'}>{formatUSD(group.summary.plUSD)}</strong>
+          <EquityChart entries={entries} period={period} chartMode={chartMode} formatUSD={formatUSD} />
+        </>
+      )}
+
+      {activeView === 'history' && (
+        <>
+          <div className="period-tabs" aria-label="Filter periode">
+            {(Object.keys(PERIOD_LABELS) as PeriodFilter[]).map((item) => (
+              <button className={period === item ? 'active' : ''} type="button" key={item} onClick={() => setPeriod(item)}>
+                {PERIOD_LABELS[item]}
+              </button>
+            ))}
+          </div>
+
+          <div className="category-tabs" aria-label="Filter kategori">
+            {(Object.keys(CATEGORY_LABELS) as CategoryFilter[]).map((item) => (
+              <button className={category === item ? 'active' : ''} type="button" key={item} onClick={() => setCategory(item)}>
+                {CATEGORY_LABELS[item]}
+              </button>
+            ))}
+          </div>
+
+          <section className="period-card compact-period">
+            <p className="eyebrow">History · {activeCategoryLabel} · {PERIOD_LABELS[period]}</p>
+            <h2>{activePeriodLabel}</h2>
+          </section>
+
+          <section className="journal-section">
+            <div className="section-title">
+              <div>
+                <p className="eyebrow">History · {activeCategoryLabel} · {PERIOD_LABELS[period]}</p>
+                <h2>Catatan trading</h2>
               </div>
+              <span>{historyEntries.length} entry</span>
+            </div>
 
-              {group.entries.map((entry) => {
-                const amount = getSignedEntryAmount(entry)
-                return (
-                  <article className="entry-card" key={entry.id}>
-                    <div className="entry-top">
-                      <div>
-                        <span className={`type-badge ${entry.type}`}>{TRANSACTION_LABELS[entry.type]}</span>
-                        <h3>{entry.type === 'trade' && entry.instrument ? entry.instrument : formatDate(entry.date)}</h3>
-                        <p>{entry.note || 'Tanpa catatan'}</p>
-                      </div>
-                      <strong className={amount === null || amount >= 0 ? 'positive' : 'negative'}>
-                        {formatEntryAmount(entry)}
-                      </strong>
+            <div className="entry-list compact-list">
+              {entryGroups.map((group) => (
+                <section className="entry-group" key={group.key}>
+                  <div className="group-head">
+                    <div>
+                      <h3>{group.label}</h3>
+                      <p>{group.entries.length} catatan</p>
                     </div>
-                    <div className="entry-meta">
-                      {entry.broker && <span>Broker {entry.broker}</span>}
-                      {entry.type === 'trade' && entry.instrument && <span>{DIRECTION_LABELS[entry.direction]} {entry.instrument}</span>}
-                      {entry.type === 'trade' && entry.entryPrice > 0 && <span>Entry {entry.entryPrice}</span>}
-                      {entry.type === 'trade' && entry.exitPrice > 0 && <span>Exit {entry.exitPrice}</span>}
-                      {entry.type === 'trade' && entry.pips !== 0 && <span>{entry.pips} pips</span>}
-                      {entry.type === 'trade' && entry.lot > 0 && <span>{entry.lot} lot</span>}
-                      {entry.type === 'deposit' && entry.depositAmount > 0 && <span>Deposit {formatDeposit(entry)}</span>}
-                      {entry.type === 'deposit' && entry.depositIDR > 0 && <span>Rupiah masuk {formatIDR(entry.depositIDR)}</span>}
-                      {entry.withdrawalUSD > 0 && <span>Tarik {formatUSD(entry.withdrawalUSD)}</span>}
-                      {entry.withdrawalIDR > 0 && <span>Rupiah cair {formatIDR(entry.withdrawalIDR)}</span>}
-                      {entry.expenseUSD > 0 && <span>Expense {formatUSD(entry.expenseUSD)}</span>}
-                      {entry.equityUSD > 0 && <span>Equity {formatUSD(entry.equityUSD)}</span>}
-                    </div>
-                    <div className="entry-actions">
-                      <button type="button" onClick={() => openEditForm(entry)}>Edit</button>
-                      <button className="danger" type="button" onClick={() => handleDelete(entry)}>Hapus</button>
-                    </div>
-                  </article>
-                )
-              })}
-            </section>
-          ))}
-        </div>
-      </section>
+                    <strong className={group.summary.plUSD >= 0 ? 'positive' : 'negative'}>{formatUSD(group.summary.plUSD)}</strong>
+                  </div>
+
+                  {group.entries.map((entry) => {
+                    const amount = getSignedEntryAmount(entry)
+                    return (
+                      <article className="entry-card compact-entry" key={entry.id}>
+                        <div className="entry-top">
+                          <div>
+                            <span className={`type-badge ${entry.type}`}>{TRANSACTION_LABELS[entry.type]}</span>
+                            <h3>{entry.type === 'trade' && entry.instrument ? entry.instrument : formatDate(entry.date)}</h3>
+                            <p>{entry.note || 'Tanpa catatan'}</p>
+                          </div>
+                          <strong className={amount === null || amount >= 0 ? 'positive' : 'negative'}>
+                            {formatEntryAmount(entry)}
+                          </strong>
+                        </div>
+                        <div className="entry-meta">
+                          {entry.broker && <span>Broker {entry.broker}</span>}
+                          {entry.type === 'trade' && entry.instrument && <span>{DIRECTION_LABELS[entry.direction]} {entry.instrument}</span>}
+                          {entry.type === 'trade' && entry.entryPrice > 0 && <span>Entry {entry.entryPrice}</span>}
+                          {entry.type === 'trade' && entry.exitPrice > 0 && <span>Exit {entry.exitPrice}</span>}
+                          {entry.type === 'trade' && entry.pips !== 0 && <span>{entry.pips} pips</span>}
+                          {entry.type === 'trade' && entry.lot > 0 && <span>{entry.lot} lot</span>}
+                          {entry.type === 'deposit' && entry.depositAmount > 0 && <span>Deposit {formatDeposit(entry)}</span>}
+                          {entry.type === 'deposit' && entry.depositIDR > 0 && <span>Rupiah masuk {formatIDR(entry.depositIDR)}</span>}
+                          {entry.withdrawalUSD > 0 && <span>Tarik {formatUSD(entry.withdrawalUSD)}</span>}
+                          {entry.withdrawalIDR > 0 && <span>Rupiah cair {formatIDR(entry.withdrawalIDR)}</span>}
+                          {entry.expenseUSD > 0 && <span>Expense {formatUSD(entry.expenseUSD)}</span>}
+                          {entry.equityUSD > 0 && <span>Equity {formatUSD(entry.equityUSD)}</span>}
+                        </div>
+                        <div className="entry-actions">
+                          <button type="button" onClick={() => openEditForm(entry)}>Edit</button>
+                          <button className="danger" type="button" onClick={() => handleDelete(entry)}>Hapus</button>
+                        </div>
+                      </article>
+                    )
+                  })}
+                </section>
+              ))}
+            </div>
+          </section>
+        </>
+      )}
 
       <button className="fab" type="button" onClick={openAddForm} aria-label="Tambah catatan trading">
         +
@@ -824,7 +837,7 @@ function App() {
             </label>
             <label>
               Broker
-              <input value={form.broker} onChange={(event) => updateForm('broker', event.target.value)} placeholder="Finex" />
+              <input value={form.broker} onChange={(event) => updateForm('broker', event.target.value)} placeholder="MIFX" />
             </label>
             <label>
               Catatan
