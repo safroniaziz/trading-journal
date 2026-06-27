@@ -1,24 +1,27 @@
 :root {
-  --bg: #060711;
-  --panel: rgba(15, 23, 42, 0.86);
-  --panel-soft: rgba(30, 41, 59, 0.72);
-  --border: rgba(148, 163, 184, 0.16);
-  --text: #e5e7eb;
-  --muted: #94a3b8;
-  --faint: #64748b;
-  --cyan: #38bdf8;
-  --violet: #a78bfa;
-  --green: #4ade80;
-  --red: #fb7185;
-  --yellow: #facc15;
-  --shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+  --bg: #fff7ed;
+  --panel: rgba(255, 255, 255, 0.88);
+  --panel-soft: rgba(255, 255, 255, 0.72);
+  --border: rgba(249, 115, 22, 0.16);
+  --text: #172033;
+  --muted: #6b7280;
+  --faint: #9ca3af;
+  --cyan: #06b6d4;
+  --violet: #8b5cf6;
+  --green: #16a34a;
+  --red: #e11d48;
+  --yellow: #f59e0b;
+  --orange: #f97316;
+  --pink: #ec4899;
+  --shadow: 0 24px 80px rgba(124, 58, 237, 0.16);
   --font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', sans-serif;
 
   font-family: var(--font);
   color: var(--text);
   background:
-    radial-gradient(circle at 20% 0%, rgba(56, 189, 248, 0.25), transparent 32rem),
-    radial-gradient(circle at 80% 10%, rgba(167, 139, 250, 0.26), transparent 28rem),
+    radial-gradient(circle at 10% 0%, rgba(251, 146, 60, 0.34), transparent 28rem),
+    radial-gradient(circle at 90% 10%, rgba(236, 72, 153, 0.22), transparent 26rem),
+    radial-gradient(circle at 50% 80%, rgba(6, 182, 212, 0.2), transparent 30rem),
     var(--bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -55,7 +58,7 @@ button {
   min-height: 100dvh;
   margin: 0 auto;
   background:
-    linear-gradient(180deg, rgba(15, 23, 42, 0.3), rgba(2, 6, 23, 0.74)),
-    rgba(2, 6, 23, 0.68);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05), var(--shadow);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 247, 237, 0.84)),
+    rgba(255, 255, 255, 0.68);
+  box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.08), var(--shadow);
 }
