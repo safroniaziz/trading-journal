@@ -1,8 +1,9 @@
-import type { JournalEntry, PeriodFilter } from './types'
+import type { ChartMode, JournalEntry, PeriodFilter } from './types'
 
 type ChartProps = {
   entries: JournalEntry[]
   period: PeriodFilter
+  chartMode: ChartMode
   formatUSD: (value: number) => string
 }
 
@@ -31,7 +32,7 @@ function getPeriodKey(date: string, period: PeriodFilter) {
   return date
 }
 
-function getChartPoints(entries: JournalEntry[], period: PeriodFilter) {
+function getEquityPoints(entries: JournalEntry[], period: PeriodFilter) {
   const sorted = [...entries]
     .filter((entry) => entry.equityUSD > 0)
     .sort((a, b) => a.date.localeCompare(b.date))
@@ -52,11 +53,33 @@ function getChartPoints(entries: JournalEntry[], period: PeriodFilter) {
   return [...points.values()]
 }
 
-export function EquityChart({ entries, period, formatUSD }: ChartProps) {
-  const points = getChartPoints(entries, period)
+function getPnlPoints(entries: JournalEntry[], period: PeriodFilter) {
+  const sorted = [...entries]
+    .filter((entry) => entry.type === 'trade' && entry.plUSD !== null)
+    .sort((a, b) => a.date.localeCompare(b.date))
+
+  let running = 0
+  const dailyPoints = sorted.map((entry) => {
+    running += entry.plUSD ?? 0
+    return { date: entry.date, value: running }
+  })
+
+  if (period === 'daily' || period === 'all') return dailyPoints
+
+  const points = new Map<string, { date: string; value: number }>()
+  dailyPoints.forEach((point) => {
+    points.set(getPeriodKey(point.date, period), point)
+  })
+
+  return [...points.values()]
+}
+
+export function EquityChart({ entries, period, chartMode, formatUSD }: ChartProps) {
+  const points = chartMode === 'pnl' ? getPnlPoints(entries, period) : getEquityPoints(entries, period)
+  const title = chartMode === 'pnl' ? 'Net P/L curve' : 'Equity curve'
 
   if (points.length === 0) {
-    return <div className="empty-chart">Belum ada data equity.</div>
+    return <div className="empty-chart">{chartMode === 'pnl' ? 'Belum ada data P/L trade.' : 'Belum ada data equity.'}</div>
   }
 
   const values = points.map((point) => point.value)
@@ -80,13 +103,13 @@ export function EquityChart({ entries, period, formatUSD }: ChartProps) {
     <div className="chart-wrap">
       <div className="chart-head">
         <div>
-          <p className="eyebrow">Equity curve</p>
+          <p className="eyebrow">{title}</p>
           <h2>{latest ? formatUSD(latest.value) : '$0.00'}</h2>
         </div>
         <span>{points.length} data</span>
       </div>
 
-      <svg className="equity-chart" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Grafik equity trading">
+      <svg className="equity-chart" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Grafik trading">
         <defs>
           <linearGradient id="lineGradient" x1="0" x2="1" y1="0" y2="0">
             <stop offset="0%" stopColor="#38bdf8" />

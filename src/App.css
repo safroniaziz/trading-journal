@@ -130,6 +130,8 @@ h3 {
 }
 
 .period-tabs,
+.category-tabs,
+.chart-tabs,
 .type-tabs {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -141,11 +143,22 @@ h3 {
   background: rgba(255, 255, 255, 0.56);
 }
 
+.category-tabs {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-top: -6px;
+}
+
+.chart-tabs {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .type-tabs {
   border-radius: 20px;
 }
 
 .period-tabs button,
+.category-tabs button,
+.chart-tabs button,
 .type-tabs button {
   min-height: 38px;
   border: 0;
@@ -156,12 +169,15 @@ h3 {
   font-weight: 800;
 }
 
+.category-tabs button,
 .type-tabs button {
   border-radius: 14px;
   font-size: 0.72rem;
 }
 
 .period-tabs button.active,
+.category-tabs button.active,
+.chart-tabs button.active,
 .type-tabs button.active {
   color: #fff;
   background: linear-gradient(135deg, var(--orange), var(--pink), var(--violet));

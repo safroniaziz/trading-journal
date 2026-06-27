@@ -2,6 +2,10 @@ export type TransactionType = 'trade' | 'deposit' | 'withdrawal' | 'expense'
 
 export type PeriodFilter = 'daily' | 'weekly' | 'monthly' | 'all'
 
+export type CategoryFilter = 'all' | TransactionType
+
+export type ChartMode = 'pnl' | 'equity'
+
 export type Currency = 'USD' | 'IDR'
 
 export type TradeDirection = 'buy' | 'sell'

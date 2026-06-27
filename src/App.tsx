@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { EquityChart } from './Chart'
-import type { JournalEntry, PeriodFilter, RateState, TradeDirection, TransactionType } from './types'
+import type { CategoryFilter, ChartMode, JournalEntry, PeriodFilter, RateState, TradeDirection, TransactionType } from './types'
 import './App.css'
 
 const ENTRIES_KEY_V1 = 'trading-journal.entries.v1'
@@ -24,6 +24,19 @@ const PERIOD_LABELS: Record<PeriodFilter, string> = {
   weekly: 'Minggu',
   monthly: 'Bulan',
   all: 'Semua',
+}
+
+const CATEGORY_LABELS: Record<CategoryFilter, string> = {
+  all: 'Semua',
+  trade: 'Trade',
+  deposit: 'Deposit',
+  withdrawal: 'Penarikan',
+  expense: 'Pengeluaran',
+}
+
+const CHART_LABELS: Record<ChartMode, string> = {
+  pnl: 'Net P/L',
+  equity: 'Equity',
 }
 
 const DIRECTION_LABELS: Record<TradeDirection, string> = {
@@ -400,13 +413,6 @@ function summarizeEntries(entries: JournalEntry[]): Summary {
   }
 }
 
-function filterEntriesByLatestPeriod(entries: JournalEntry[], period: PeriodFilter) {
-  if (period === 'all' || entries.length === 0) return entries
-  const latest = sortEntries(entries)[0]
-  const latestKey = getPeriodKey(latest.date, period)
-  return entries.filter((entry) => getPeriodKey(entry.date, period) === latestKey)
-}
-
 function groupEntries(entries: JournalEntry[], period: PeriodFilter): EntryGroup[] {
   const fallbackPeriod = period === 'all' ? 'monthly' : period
   const groupMap = new Map<string, JournalEntry[]>()
@@ -492,6 +498,8 @@ function validateForm(form: FormState) {
 function App() {
   const [entries, setEntries] = useState<JournalEntry[]>(parseStoredEntries)
   const [period, setPeriod] = useState<PeriodFilter>('monthly')
+  const [category, setCategory] = useState<CategoryFilter>('all')
+  const [chartMode, setChartMode] = useState<ChartMode>('pnl')
   const [rate, setRate] = useState<RateState>(() => {
     const stored = localStorage.getItem(RATE_KEY)
     if (!stored) return { value: FALLBACK_RATE, updatedAt: null, source: 'fallback' }
@@ -547,12 +555,17 @@ function App() {
   }, [])
 
   const sortedEntries = useMemo(() => sortEntries(entries), [entries])
-  const visibleEntries = useMemo(() => filterEntriesByLatestPeriod(entries, period), [entries, period])
+  const visibleEntries = useMemo(() => {
+    const sorted = sortEntries(entries)
+    if (category === 'all') return sorted
+    return sorted.filter((entry) => entry.type === category)
+  }, [entries, category])
   const entryGroups = useMemo(() => groupEntries(visibleEntries, period), [visibleEntries, period])
   const summary = useMemo(() => summarizeEntries(visibleEntries), [visibleEntries])
   const latestEntry = sortedEntries[0]
   const latestEquityUSD = latestEntry?.equityUSD ?? 0
   const activePeriodLabel = entryGroups[0]?.label ?? 'Belum ada data'
+  const activeCategoryLabel = CATEGORY_LABELS[category]
 
   function updateForm<K extends keyof FormState>(field: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [field]: value }))
@@ -663,6 +676,14 @@ function App() {
         ))}
       </div>
 
+      <div className="category-tabs" aria-label="Filter kategori">
+        {(Object.keys(CATEGORY_LABELS) as CategoryFilter[]).map((item) => (
+          <button className={category === item ? 'active' : ''} type="button" key={item} onClick={() => setCategory(item)}>
+            {CATEGORY_LABELS[item]}
+          </button>
+        ))}
+      </div>
+
       <section className="period-card">
         <p className="eyebrow">Ringkasan aktif</p>
         <h2>{activePeriodLabel}</h2>
@@ -701,12 +722,20 @@ function App() {
         </article>
       </section>
 
-      <EquityChart entries={visibleEntries} period={period} formatUSD={formatUSD} />
+      <div className="chart-tabs" aria-label="Mode chart">
+        {(Object.keys(CHART_LABELS) as ChartMode[]).map((mode) => (
+          <button className={chartMode === mode ? 'active' : ''} type="button" key={mode} onClick={() => setChartMode(mode)}>
+            {CHART_LABELS[mode]}
+          </button>
+        ))}
+      </div>
+
+      <EquityChart entries={visibleEntries} period={period} chartMode={chartMode} formatUSD={formatUSD} />
 
       <section className="journal-section">
         <div className="section-title">
           <div>
-            <p className="eyebrow">History · {activePeriodLabel}</p>
+            <p className="eyebrow">History · {activeCategoryLabel} · {PERIOD_LABELS[period]}</p>
             <h2>Catatan trading</h2>
           </div>
           <span>{visibleEntries.length} entry</span>
